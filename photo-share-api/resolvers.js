@@ -65,7 +65,7 @@ const resolvers = {
 				.toArray(),
     },
     Mutation: {
-		async postPhoto(parent, args, { db, currentUser }) {
+		async postPhoto(parent, args, { db, currentUser, pubsub }) {
 			if(!currentUser) {
 				throw new Error('only an authorized user can post a photo')
 			}
@@ -78,6 +78,8 @@ const resolvers = {
 
 			const { insertedIds } = await db.collection('photos').insertOne(newPhoto)
 			newPhoto.id = insertedIds[0]
+
+			pubsub.publish('photo-added', {newPhoto})
 
 			return newPhoto
 		},
@@ -139,8 +141,14 @@ const resolvers = {
 			  token: user.githubToken,
 			  user
 			}
-		}
+		},
     },
+	Subscription: {
+		newPhoto: {
+			subscribe: (parent, args, { pubsub }) => 
+				pubsub.asyncIterator('photo-added')
+		}
+	},
     Photo: {
 		id: parent => parent.id || parent._id,
 		url: parent => `/img/photos/${parent._id}.jpg`,
